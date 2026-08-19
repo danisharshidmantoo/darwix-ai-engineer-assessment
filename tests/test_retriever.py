@@ -113,6 +113,42 @@ def test_nonsense_query_returns_no_relevant_results(tmp_path: Path):
     assert response.has_results is False
 
 
+def test_contextual_indexing_regresses_known_retrieval_queries(tmp_path: Path):
+    index_path = tmp_path / "vector_store.json"
+    build_index(docs_dir=CORPUS_DIR, index_path=index_path)
+    retriever = load_retriever(index_path, top_k=3, min_similarity=0.18)
+
+    expected_documents = {
+        "What qualifications are required for this role?": "job_description",
+        "Who is eligible to apply for the internship?": "eligibility_policy",
+        "What happens during the technical screening?": "screening_process",
+        "Is this internship paid?": "candidate_faqs",
+        (
+            "What is the full hiring process from application through a "
+            "full-time offer?"
+        ): "hiring_process",
+    }
+    for query, expected_document in expected_documents.items():
+        response = retriever.retrieve(query)
+        assert response.has_results
+        assert response.results[0].document_id == expected_document
+
+    qualification = retriever.retrieve(
+        "What qualifications are required for this role?"
+    ).results[0]
+    assert qualification.document_id == "job_description"
+    assert "Document title:" not in qualification.content
+    assert "Content:" not in qualification.content
+
+    unsupported = retriever.retrieve(
+        "I don't want to complete the coding assessment."
+    )
+    assert unsupported.results == []
+
+    weather = retriever.retrieve("Will it rain in Mumbai tomorrow?")
+    assert weather.results == []
+
+
 def test_full_ingest_reload_retrieval_round_trip(tmp_path: Path):
     index_path = tmp_path / "idx.json"
     first = build_index(docs_dir=CORPUS_DIR, index_path=index_path)

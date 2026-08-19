@@ -1,8 +1,16 @@
 from darwix.embeddings import (
+    DEFAULT_DIMENSIONS,
     HashedNgramEmbedding,
     cosine_similarity,
+    embedding_text_for_chunk,
     provider_from_config,
 )
+from darwix.schema import Chunk
+
+
+def test_default_embedding_dimension_is_1024():
+    assert DEFAULT_DIMENSIONS == 1024
+    assert HashedNgramEmbedding().config.dimensions == 1024
 
 
 def test_embedding_shape_and_unit_norm():
@@ -28,7 +36,7 @@ def test_config_is_explicit_and_round_trips_through_provider_factory():
     cfg = embedder.config
     assert cfg.provider == "hashed_ngram"
     assert cfg.dimensions == 128
-    assert cfg.version == 2
+    assert cfg.version == 3
     rebuilt = provider_from_config(cfg)
     assert rebuilt.config == cfg
     assert rebuilt.embed_one("paid internship") == embedder.embed_one(
@@ -55,3 +63,24 @@ def test_similar_phrases_outrank_unrelated_text():
 def test_empty_string_returns_zero_vector():
     vec = HashedNgramEmbedding(dimensions=32).embed_one("")
     assert vec == [0.0] * 32
+
+
+def test_chunk_embedding_text_adds_metadata_without_changing_content():
+    chunk = Chunk(
+        chunk_id="d::0000",
+        doc_id="d",
+        text="Python proficiency is required.",
+        position=0,
+        title="AI Engineer Intern",
+        source_path="d.md",
+        source_format="markdown",
+        doc_type="job_description",
+        section="Required qualifications",
+        metadata={},
+    )
+
+    assert embedding_text_for_chunk(chunk) == (
+        "Document title: AI Engineer Intern\n"
+        "Section: Required qualifications\n"
+        "Content: Python proficiency is required."
+    )

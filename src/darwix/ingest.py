@@ -19,7 +19,11 @@ from typing import Optional, Sequence, Union
 
 from darwix.chunker import DEFAULT_CHUNK_OVERLAP, DEFAULT_CHUNK_SIZE, Chunker
 from darwix.cleaning import clean_document
-from darwix.embeddings import EmbeddingProvider, HashedNgramEmbedding
+from darwix.embeddings import (
+    EmbeddingProvider,
+    HashedNgramEmbedding,
+    embedding_text_for_chunk,
+)
 from darwix.loaders.markdown_loader import MarkdownLoader
 from darwix.retriever import DEFAULT_MIN_SIMILARITY, DEFAULT_TOP_K, Retriever
 from darwix.vector_store import VectorStore
@@ -45,7 +49,7 @@ def build_index(
         clean_document(document)
 
     chunks = chunker.chunk_documents(documents)
-    embeddings = embedder.embed([chunk.text for chunk in chunks])
+    embeddings = embedder.embed([embedding_text_for_chunk(chunk) for chunk in chunks])
 
     store = VectorStore(
         embedding_config=embedder.config,

@@ -16,14 +16,16 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Sequence, Tuple
 
+from darwix.schema import Chunk
+
 _WHITESPACE_RE = re.compile(r"\s+")
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
-DEFAULT_DIMENSIONS = 256
+DEFAULT_DIMENSIONS = 1024
 DEFAULT_NGRAM_MIN = 3
 DEFAULT_NGRAM_MAX = 5
 PROVIDER_HASHED_NGRAM = "hashed_ngram"
-PROVIDER_VERSION = 2
+PROVIDER_VERSION = 3
 
 _CHAR_WEIGHT = 0.35
 _WORD_WEIGHT = 6.0
@@ -152,6 +154,20 @@ class HashedNgramEmbedding(EmbeddingProvider):
 
     def embed(self, texts: Sequence[str]) -> List[List[float]]:
         return [_vectorize(text, self._config) for text in texts]
+
+
+def embedding_text_for_chunk(chunk: Chunk) -> str:
+    """Return contextual text used only to embed an indexed chunk.
+
+    The original ``chunk.text`` remains the stored and retrieved content.
+    Repeating the title and section as labelled fields gives the lightweight
+    lexical embedder stable document context without changing the chunk schema.
+    """
+    context = [f"Document title: {chunk.title}"]
+    if chunk.section:
+        context.append(f"Section: {chunk.section}")
+    context.append(f"Content: {chunk.text}")
+    return "\n".join(context)
 
 
 def provider_from_config(config: EmbeddingConfig) -> EmbeddingProvider:
