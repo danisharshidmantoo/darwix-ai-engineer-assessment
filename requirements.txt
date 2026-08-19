@@ -7,3 +7,5 @@
 
 pyyaml>=6.0,<7.0      # parse YAML front matter in synthetic Markdown docs
 pytest>=7.4,<9.0       # test runner
+python-dotenv>=1.0,<2.0 # load local LiveKit configuration without hardcoding secrets
+livekit-agents>=1.4,<2.0 # Q1 voice runtime, function tools, and Cloud inference

@@ -1,4 +1,4 @@
-# Darwix AI Engineer Assessment — Q2 Knowledge Base / RAG
+# Darwix AI Engineer Assessment — Q1 Voice Agent + Q2 Knowledge Base
 
 ## Use case
 
@@ -17,8 +17,9 @@ into an LLM prompt.
 
 ## What exists right now
 
-This stage is **Q2 retrieval** on top of the existing document foundation
-(load → clean → schema). It does **not** include the Q1 voice agent.
+The project now includes Q1's candidate-screening voice-agent domain layer
+and Q2 retrieval on top of the existing document foundation (load → clean →
+schema).
 
 Concretely, this stage delivers:
 
@@ -80,7 +81,7 @@ darwix-ai-engineer-assessment/
 ## Offline embeddings and vector store (design and limits)
 
 **Embeddings.** `HashedNgramEmbedding` maps text to a fixed-length vector
-(default 256 dimensions) using signed SHA-256 feature hashing over
+(default 1024 dimensions) using signed SHA-256 feature hashing over
 character n-grams (3–5) and word uni/bigrams. Vectors are L2-normalized.
 The same string always produces the same vector in any process (Python's
 built-in `hash()` is **not** used, because it is randomized per process).
@@ -141,23 +142,100 @@ pytest -v
 Tests rebuild indexes under pytest's `tmp_path`; you do not need a
 pre-built `data/index/` file to run them.
 
+## Q1 candidate-screening voice agent
+
+Q1 is a minimal LiveKit Python agent backed by the existing Q2 retriever. It
+does not copy the FAQs, objections, policies, job description, or hiring
+process into its prompt.
+
+```mermaid
+flowchart LR
+    Candidate[Candidate: browser / Agent Console] --> LK[LiveKit AgentSession\nSTT → LLM → TTS]
+    LK --> Flow[Q1 ScreeningFlow\nexplicit candidate state]
+    LK --> Tool[Q1 knowledge tool]
+    Tool --> Q2[Q2 load_retriever()]
+    Q2 --> Store[JSON VectorStore\nsynthetic corpus]
+    Q2 --> Tool
+    Tool --> LK
+    Flow --> Escalation[Local escalation event]
+```
+
+### Grounding and screening behavior
+
+The LiveKit agent keeps explicit Python state for enrollment status, work
+authorization, weekly availability, availability start date, Python
+experience, RAG/vector-database experience, two role-relevant technical
+signals, unresolved conflicts, and escalation requests. This is collection
+state only: it never makes a final hiring decision or approves an exception.
+
+For every factual role, policy, eligibility, process, or objection question,
+the agent calls `KnowledgeBase.search()`, which calls the existing Q2
+`load_retriever()` implementation. It returns retrieved source text and
+citations to the LLM. When Q2 has no result above its existing threshold, the
+agent must say that the information is unavailable and offer human help; it
+must not invent an answer. Unsupported coding-assessment questions therefore
+fall back rather than being treated as answered.
+
+### Setup and run
+
+Build the Q2 index first, then install the dependencies and configure local
+credentials:
+
+```bash
+python -m darwix.ingest
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Set `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` in `.env` for
+the existing LiveKit Cloud project. The default agent uses LiveKit Cloud
+inference for STT, LLM, and TTS, so it does not require a separate model
+provider key.
+
+Start the voice agent in development mode:
+
+```bash
+lk agent dev src/darwix/q1/livekit_agent.py
+```
+
+The official LiveKit Agent Console is the browser/web calling interface. Open
+the project Agent Console, choose `darwix-candidate-screening`, and start a
+session with microphone access. The console displays the conversation and
+tool activity. A live session is required for actual audio recordings and
+transcripts; this repository does not fabricate them.
+
+### Deterministic Q1 scenarios
+
+The simulation uses the same `ScreeningFlow` and `KnowledgeBase` services as
+the LiveKit tools, but requires no microphone or model credentials:
+
+```bash
+python -m darwix.q1.simulate
+pytest -q tests/test_q1.py
+pytest -q
+```
+
+It covers cooperative, objection, incomplete, conflicting, out-of-scope, and
+human-assistance scenarios. It writes no escalation to a CRM; escalation is a
+structured local event for this assessment.
+
+### Known limitations
+
+- The default Q2 embedding is deterministic lexical hashing, not a dense
+  semantic model; retrieval quality depends on corpus wording.
+- The corpus has no policy-grounded response for refusing a coding assessment,
+  so the agent correctly returns the unavailable-information fallback.
+- A real browser call, recordings, and voice transcripts require a running
+  LiveKit session and the configured Cloud project credentials.
+
 ## Configuration
 
-No API keys or external services are required for Q2. See `.env.example`
-for placeholders that later stages (Q1 voice / hosted models) may use.
+No API keys or external services are required for Q2. Q1 requires the
+LiveKit Cloud environment variables listed in `.env.example`; never commit a
+populated `.env` file.
 
 ## What is explicitly NOT built yet
 
-- The Q1 voice agent (ASR, conversation manager, TTS)
-- LLM answer generation over retrieved chunks
-- Deterministic screening rules / candidate state
 - Neural / API embedding models
 - Q3 (Philippines / Indonesia localization)
 - Q4 (real-time streaming nudges)
-
-## Next stage
-
-After Q2 retrieval is solid, start Q1: a conversation manager that calls
-the Q2 retriever for FAQ/policy questions and keeps deterministic
-screening logic (eligibility checks, required questions) in code, not in
-the LLM prompt.
