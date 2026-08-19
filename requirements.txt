@@ -1,0 +1,7 @@
+# Stage: Q2 foundation (document schema, loading, cleaning) only.
+# Do not add embedding/vector-db/LLM/voice dependencies here yet —
+# those belong to later stages and should get their own additions
+# once that code exists.
+
+pyyaml>=6.0,<7.0      # parse YAML front matter in synthetic Markdown docs
+pytest>=7.4,<9.0       # test runner
