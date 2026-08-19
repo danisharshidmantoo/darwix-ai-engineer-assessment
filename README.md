@@ -1,4 +1,4 @@
-# Darwix AI Engineer Assessment — Q1/Q2 Foundation
+# Darwix AI Engineer Assessment — Q2 Knowledge Base / RAG
 
 ## Use case
 
@@ -15,26 +15,32 @@ into an LLM prompt.
 > criteria. Every document is labelled `is_synthetic: true` in its front
 > matter and carries a disclaimer in its body.
 
-## What exists right now (this stage)
+## What exists right now
 
-This is the **Q2 foundation only**: the document ingestion layer that later
-pipeline stages (cleaning → chunking → embeddings → vector DB → retrieval)
-will build on. Nothing beyond loading + cleaning + schema is implemented yet.
+This stage is **Q2 retrieval** on top of the existing document foundation
+(load → clean → schema). It does **not** include the Q1 voice agent.
 
 Concretely, this stage delivers:
 
-1. A clean, modular Python project (`src/darwix/`, `data/`, `tests/`).
+1. A modular Python project (`src/darwix/`, `data/`, `tests/`).
 2. Six synthetic candidate-screening documents in Markdown with YAML front
    matter metadata.
-3. A `Document` schema (`src/darwix/schema.py`) used by every later stage.
-4. A Markdown loader (`src/darwix/loaders/markdown_loader.py`) that parses
-   front matter + body into `Document` objects.
-5. A text cleaner (`src/darwix/cleaning.py`) that normalizes whitespace,
-   unicode, and punctuation without destroying meaning (no chunking, no
-   lowercasing of content — that would hurt later retrieval quality).
-6. A `BaseDocumentLoader` abstraction so PDF and web loaders can be added
-   later without changing the `Document` schema or downstream code.
-7. Unit tests for the loader and cleaner.
+3. A `Document` schema and a `Chunk` schema (`src/darwix/schema.py`).
+4. A Markdown loader (`src/darwix/loaders/markdown_loader.py`) and a
+   `BaseDocumentLoader` abstraction for later PDF/web loaders.
+5. A conservative text cleaner (`src/darwix/cleaning.py`) that does **not**
+   lowercase stored content.
+6. Metadata-aware chunking (`src/darwix/chunker.py`) with stable chunk IDs,
+   heading/section labels, and configurable size/overlap.
+7. An offline, deterministic embedding provider (`src/darwix/embeddings.py`)
+   behind a swappable `EmbeddingProvider` interface. No paid APIs and no
+   network calls.
+8. A persistent local JSON vector store (`src/darwix/vector_store.py`) that
+   records embedding/chunker configuration next to the vectors.
+9. An ingest pipeline and retriever (`src/darwix/ingest.py`,
+   `src/darwix/retriever.py`) with top-k cosine search, citation metadata,
+   and a minimum similarity threshold for ungrounded queries.
+10. Unit and integration tests for foundation + Q2 behavior.
 
 ## Project structure
 
@@ -46,43 +52,80 @@ darwix-ai-engineer-assessment/
 ├── pyproject.toml
 ├── .gitignore
 ├── data/
-│   └── synthetic_docs/          # synthetic knowledge base source documents
-│       ├── job_description.md
-│       ├── eligibility_policy.md
-│       ├── screening_process.md
-│       ├── candidate_faqs.md
-│       ├── common_objections.md
-│       └── hiring_process.md
+│   ├── synthetic_docs/          # synthetic knowledge base source documents
+│   └── index/                   # generated locally; not committed
 ├── src/
 │   └── darwix/
 │       ├── __init__.py
-│       ├── schema.py             # Document dataclass (shared schema)
-│       ├── cleaning.py           # text normalization utilities
+│       ├── schema.py             # Document + Chunk
+│       ├── cleaning.py
+│       ├── chunker.py
+│       ├── embeddings.py         # EmbeddingProvider + hashed n-grams
+│       ├── vector_store.py       # JSON persistence + brute-force cosine
+│       ├── retriever.py
+│       ├── ingest.py             # load → clean → chunk → embed → save
 │       └── loaders/
 │           ├── __init__.py
-│           ├── base.py           # BaseDocumentLoader (extensible)
+│           ├── base.py
 │           └── markdown_loader.py
 └── tests/
     ├── test_loader.py
-    └── test_cleaner.py
+    ├── test_cleaner.py
+    ├── test_chunker.py
+    ├── test_embeddings.py
+    ├── test_vector_store.py
+    └── test_retriever.py
 ```
 
-## Why it's structured this way
+## Offline embeddings and vector store (design and limits)
 
-- **`Document` is format-agnostic.** It has a `source_format` field
-  (`"markdown"` today). A future `PdfLoader` or `WebLoader` just needs to
-  produce the same `Document` object — nothing downstream needs to know or
-  care where the text came from.
-- **`BaseDocumentLoader` is the extension point.** Adding PDF or web
-  ingestion later means writing `PdfLoader(BaseDocumentLoader)` /
-  `WebLoader(BaseDocumentLoader)` and implementing one method
-  (`load_file`). `load_directory` is inherited for free.
-- **Cleaning is separate from loading.** `cleaning.py` has no knowledge of
-  files, front matter, or metadata — it only transforms strings. This keeps
-  it trivially testable and reusable by the future chunker.
-- **No chunking, embeddings, or vector DB yet.** Those are the *next* stage
-  and depend on a stable, tested loader + cleaner, which is what this stage
-  provides.
+**Embeddings.** `HashedNgramEmbedding` maps text to a fixed-length vector
+(default 256 dimensions) using signed SHA-256 feature hashing over
+character n-grams (3–5) and word uni/bigrams. Vectors are L2-normalized.
+The same string always produces the same vector in any process (Python's
+built-in `hash()` is **not** used, because it is randomized per process).
+
+This is **not** a neural embedding model. It captures lexical/character
+overlap, so it can rank FAQ/policy passages that share wording with a
+query. It will not match paraphrases that share little surface form.
+A future dense model can implement `EmbeddingProvider` and rebuild the
+index; ingest persists `EmbeddingConfig` so retrieval refuses a silent
+mismatch.
+
+**Vector store.** Indexed chunks are stored as JSON (paths, text,
+metadata, and float vectors). Search is exact cosine similarity over all
+vectors. The synthetic corpus is small, so this needs no Chroma, FAISS, or
+NumPy. Rebuilding the index is deterministic for the same documents and
+chunker/embedding settings.
+
+**Grounding.** `Retriever` drops hits below `min_similarity` (default
+`0.18`). Queries with no hit at or above that threshold return an empty
+result list (`has_results` is false). Empty/whitespace queries raise
+`ValueError`.
+
+## Build / rebuild the local index
+
+From the project root (after installing requirements):
+
+```bash
+python -m darwix.ingest
+```
+
+This reads `data/synthetic_docs/*.md` and writes
+`data/index/vector_store.json` (gitignored). Options:
+
+```bash
+python -m darwix.ingest \
+  --docs data/synthetic_docs \
+  --index data/index/vector_store.json \
+  --chunk-size 700 \
+  --chunk-overlap 120
+```
+
+Rebuild after changing documents, chunker settings, or the embedding
+provider. Retrieval loads the provider from the file; if you pass a
+different `EmbeddingProvider` config, it raises rather than searching with
+incompatible vectors.
 
 ## Running the tests
 
@@ -95,33 +138,26 @@ pip install -r requirements.txt
 pytest -v
 ```
 
+Tests rebuild indexes under pytest's `tmp_path`; you do not need a
+pre-built `data/index/` file to run them.
+
 ## Configuration
 
-No API keys or external services are required for this stage. See
-`.env.example` for the (currently unused) placeholders that later stages
-will need.
+No API keys or external services are required for Q2. See `.env.example`
+for placeholders that later stages (Q1 voice / hosted models) may use.
 
 ## What is explicitly NOT built yet
 
-- Chunking / metadata-aware splitting
-- Embeddings + vector database + retrieval + citations
 - The Q1 voice agent (ASR, conversation manager, TTS)
+- LLM answer generation over retrieved chunks
 - Deterministic screening rules / candidate state
+- Neural / API embedding models
 - Q3 (Philippines / Indonesia localization)
 - Q4 (real-time streaming nudges)
 
-## Next stage (for whoever picks this up next)
+## Next stage
 
-1. Add a `chunker.py` that takes a cleaned `Document` and produces
-   `Chunk` objects (id, doc_id, text, position, metadata inherited from the
-   parent document — e.g. `doc_type`, `title`).
-2. Add an `embeddings.py` wrapping a single embedding provider (keep it
-   swappable behind a small interface).
-3. Add a minimal local vector store (e.g. Chroma or a flat FAISS index —
-   pick whichever keeps dependencies smallest) plus a `retriever.py` that
-   returns top-k chunks with citation metadata (`doc_id`, `title`, source
-   path).
-4. Only after Q2 retrieval is solid, start Q1: a conversation manager that
-   calls the Q2 retriever for FAQ/policy questions and keeps deterministic
-   screening logic (eligibility checks, required questions) in code, not in
-   the LLM prompt.
+After Q2 retrieval is solid, start Q1: a conversation manager that calls
+the Q2 retriever for FAQ/policy questions and keeps deterministic
+screening logic (eligibility checks, required questions) in code, not in
+the LLM prompt.

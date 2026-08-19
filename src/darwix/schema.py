@@ -73,3 +73,67 @@ class Document:
             "metadata": self.metadata,
             "loaded_at": self.loaded_at,
         }
+
+
+@dataclass
+class Chunk:
+    """A retrieval unit produced from a cleaned `Document`.
+
+    Document-level fields (`doc_id`, `title`, `doc_type`, `source_path`,
+    `source_format`) are copied onto every chunk so citations do not need
+    to join back to the parent document. `section` is the nearest Markdown
+    heading, when one exists.
+
+    `chunk_id` is assigned by the chunker and must be stable for the same
+    document text, chunker configuration, and position.
+    """
+
+    chunk_id: str
+    doc_id: str
+    text: str
+    position: int
+    title: str
+    source_path: str
+    source_format: str
+    doc_type: str
+    section: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.chunk_id or not self.chunk_id.strip():
+            raise ValueError("Chunk.chunk_id must be a non-empty string")
+        if self.position < 0:
+            raise ValueError(
+                f"Chunk '{self.chunk_id}' position must be >= 0"
+            )
+        if not self.text or not self.text.strip():
+            raise ValueError(f"Chunk '{self.chunk_id}' has empty text")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "chunk_id": self.chunk_id,
+            "doc_id": self.doc_id,
+            "text": self.text,
+            "position": self.position,
+            "title": self.title,
+            "source_path": self.source_path,
+            "source_format": self.source_format,
+            "doc_type": self.doc_type,
+            "section": self.section,
+            "metadata": self.metadata,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Chunk":
+        return cls(
+            chunk_id=data["chunk_id"],
+            doc_id=data["doc_id"],
+            text=data["text"],
+            position=int(data["position"]),
+            title=data["title"],
+            source_path=data["source_path"],
+            source_format=data["source_format"],
+            doc_type=data["doc_type"],
+            section=data.get("section"),
+            metadata=dict(data.get("metadata") or {}),
+        )

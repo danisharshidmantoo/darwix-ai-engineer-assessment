@@ -1,8 +1,9 @@
 """
-darwix — Q1/Q2 foundation package.
+darwix — Q1/Q2 package.
 
-Current stage: document schema, Markdown loading, and text cleaning.
-See README.md for what exists and what is planned next.
+Current stage: document schema, Markdown loading, cleaning, chunking,
+offline embeddings, a local JSON vector store, and retrieval.
+See README.md for usage and limitations.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

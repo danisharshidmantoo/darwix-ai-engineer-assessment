@@ -1,7 +1,9 @@
-# Stage: Q2 foundation (document schema, loading, cleaning) only.
-# Do not add embedding/vector-db/LLM/voice dependencies here yet —
-# those belong to later stages and should get their own additions
-# once that code exists.
+# Q2: document schema, loading, cleaning, chunking, offline embeddings,
+# local JSON vector store, and retrieval.
+#
+# Embeddings and the vector index are implemented with the standard library
+# (hashed n-grams + JSON). Do not add Chroma/FAISS/API clients unless a
+# later stage actually uses them.
 
 pyyaml>=6.0,<7.0      # parse YAML front matter in synthetic Markdown docs
 pytest>=7.4,<9.0       # test runner

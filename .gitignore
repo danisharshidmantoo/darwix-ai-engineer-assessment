@@ -12,3 +12,6 @@ __pycache__/
 .DS_Store
 
 *.log
+
+# Generated Q2 index (rebuild with: python -m darwix.ingest)
+data/index/
