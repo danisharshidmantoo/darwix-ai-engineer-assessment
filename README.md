@@ -1,65 +1,91 @@
 # Darwix AI Engineer Assessment — Q1–Q4
 
+> End-to-end AI systems for grounded voice interaction, production-oriented retrieval, multilingual voice agents, and real-time agent assistance.
+
 ## Overview
 
-This repository contains the implementation for the Darwix AI Engineer assessment.
+This repository contains my implementation for the **Darwix AI Engineer Assessment**.
 
-The project is organized into four major areas:
+The assessment focuses on building reliable AI systems from unstructured business data while addressing production-oriented concerns such as:
 
-- **Q1 — Candidate Screening Voice Agent**
-- **Q2 — Knowledge Base / Retrieval System**
-- **Q3 — Localized Voice Bots**
-  - Philippines
-  - Indonesia
-- **Q4 — Real-Time Streaming Nudges**
+- grounded responses
+- explicit business logic
+- retrieval traceability
+- multilingual and code-switched conversations
+- safe fallbacks and escalation
+- real-time signal detection
+- actionable agent nudges
+- latency measurement
+- automated testing
 
-Q1 and Q2 are designed to work together: the voice agent retrieves answers about the role, eligibility, and process from the Q2 knowledge base instead of hardcoding FAQs or policy text into an LLM prompt.
+The implementation covers all four assessment questions:
 
-> **All data in this repository is synthetic assessment data.**
->
-> The documents in `data/synthetic_docs/` and the localized Q3 knowledge bases are created for this assessment only. They do **not** represent real Darwix policy, process, hiring criteria, financial policy, or production business rules.
+| Question | Solution | Primary Focus |
+|---|---|---|
+| **Q1** | Knowledge-Grounded Voice Agent | Voice interaction + qualification + RAG |
+| **Q2** | Production-Ready Knowledge Base | Cleaning + chunking + embeddings + retrieval |
+| **Q3** | Native-Language Voice Bots | Filipino/Taglish + Bahasa Indonesia |
+| **Q4** | Real-Time Agent Assist | Streaming + signals + nudges + latency |
+
+> **Assessment data is synthetic.** The documents and localized content in this repository are created specifically for the assessment and do not represent real Darwix policies, financial products, hiring criteria, or production business rules.
 
 ---
 
-# Q1 — Candidate Screening Voice Agent
+# System Architecture
 
-## Use case
+The four questions form a broader AI application architecture.
 
-**Candidate screening for an AI Engineer Intern role.**
+```text
+                         ┌──────────────────────────┐
+                         │       User / Caller      │
+                         └────────────┬─────────────┘
+                                      │
+                                      ▼
+                         ┌──────────────────────────┐
+                         │     Voice Interface      │
+                         │   LiveKit / Voice Bots   │
+                         └────────────┬─────────────┘
+                                      │
+                    ┌─────────────────┴─────────────────┐
+                    │                                   │
+                    ▼                                   ▼
+          ┌──────────────────┐                ┌──────────────────┐
+          │ Q1 Screening Flow│                │ Q3 Localization  │
+          │ Qualification    │                │ PH / Indonesia   │
+          └────────┬─────────┘                └──────────────────┘
+                   │
+                   │ knowledge queries
+                   ▼
+          ┌────────────────────────────┐
+          │       Q2 Retrieval         │
+          │                            │
+          │ Cleaning → Chunking        │
+          │ → Embeddings → Vector Store│
+          │ → Retrieval / Ranking      │
+          └────────────┬───────────────┘
+                       │
+                       ▼
+              ┌──────────────────┐
+              │ Grounded Context │
+              │ + Source Evidence│
+              └──────────────────┘
 
-Q1 is a minimal LiveKit Python voice agent backed by the Q2 retriever.
 
-The agent keeps explicit Python state for:
+              Real-Time Agent Assist — Q4
 
-- enrollment status
-- work authorization
-- weekly availability
-- availability start date
-- Python experience
-- RAG/vector-database experience
-- role-relevant technical signals
-- unresolved conflicts
-- human-escalation requests
-
-This is collection state only. The agent does not make a final hiring decision or approve exceptions.
-
-## Architecture
-
-```mermaid
-flowchart LR
-    Candidate["Candidate"]
-    LiveKit["LiveKit AgentSession<br/>STT → LLM → TTS"]
-    Flow["Q1 ScreeningFlow<br/>explicit candidate state"]
-    Tool["Q1 Knowledge Tool"]
-    Retriever["Q2 Retriever"]
-    Store["JSON Vector Store"]
-    Escalation["Local Escalation Event"]
-
-    Candidate --> LiveKit
-    LiveKit --> Flow
-    LiveKit --> Tool
-    Tool --> Retriever
-    Retriever --> Store
-    Retriever --> Tool
-    Tool --> LiveKit
-    Flow --> Escalation
+        Live Audio / Replay Stream
+                    │
+                    ▼
+             Streaming ASR
+                    │
+                    ▼
+          Transcript Chunks
+                    │
+                    ▼
+            Signal Extraction
+                    │
+                    ▼
+             Nudge Engine
+                    │
+                    ▼
+          Dashboard / Delivery
