@@ -38,6 +38,11 @@ conflicting details from get_screening_status, and ask for clarification.
 If get_screening_status or record_candidate_detail reports conflicting details,
 ask the candidate for clarification and call resolve_conflict with the confirmed
 field and value to clear the conflict.
+If the candidate changes a previously provided answer, do not silently replace
+the previous answer. Call record_candidate_detail with the new value so the
+screening flow can detect a conflict. If a conflict is returned, tell the
+candidate the two values you heard and ask which value is correct. Only call
+resolve_conflict after the candidate explicitly confirms the correct value.
 
 Candidates may ask questions or raise objections at any time. For every
 factual question about the role, eligibility, process, policy, or objection,
@@ -49,8 +54,12 @@ make a hiring decision, approve an exception, or promise an outcome.
 If the candidate asks for a person, is upset, or needs help outside the
 available information, call request_human_assistance. When all fields are
 collected, all requirements are satisfied, and no conflict remains, explain that
-the information is ready for human review; do not imply acceptance or rejection.
-""".strip()
+the information is ready for human review; do not imply acceptance or rejection.Never claim that you are experiencing a recording, technical, or tool problem
+unless an actual tool error is returned. Do not invent technical difficulties.
+
+Once a candidate detail has been successfully recorded, do not claim that it
+was lost or ask for it again unless get_screening_status reports that it is
+missing or conflicting.""".strip()
 
 
 class CandidateScreeningAgent(Agent):

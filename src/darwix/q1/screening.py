@@ -102,7 +102,7 @@ class ScreeningFlow:
 
     def record_detail(self, field: str, value: str) -> dict:
         """Store one stated detail, retaining a conflict for clarification."""
-        normalized_field = field.strip().lower()
+        normalized_field = _normalize_screening_field(field)
         normalized_value = value.strip()
         if normalized_field not in SCREENING_FIELDS:
             raise ValueError(f"Unknown screening field: {field!r}")
@@ -131,7 +131,7 @@ class ScreeningFlow:
 
     def resolve_conflict(self, field: str, confirmed_value: str) -> dict:
         """Clear the conflict on a field and update its confirmed value."""
-        normalized_field = field.strip().lower()
+        normalized_field = _normalize_screening_field(field)
         normalized_value = confirmed_value.strip()
         if normalized_field not in SCREENING_FIELDS:
             raise ValueError(f"Unknown screening field: {field!r}")
@@ -238,7 +238,34 @@ def evaluate_screening_state(state: CandidateScreeningState) -> ScreeningEvaluat
         conflicts=conflicts,
         field_evaluations=field_evals,
     )
+def _normalize_screening_field(field: str) -> str:
+    """Normalize natural-language field names to internal screening keys."""
+    normalized = re.sub(r"[^a-z0-9]+", "_", field.strip().lower()).strip("_")
 
+    aliases = {
+        "enrollment_status": "enrollment_status",
+        "enrollment": "enrollment_status",
+        "work_authorization": "work_authorization",
+        "work_authorisation": "work_authorization",
+        "work_auth": "work_authorization",
+        "weekly_availability": "weekly_hours",
+        "weekly_hours": "weekly_hours",
+        "hours_per_week": "weekly_hours",
+        "availability_start_date": "availability_start_date",
+        "start_date": "availability_start_date",
+        "preferred_start_date": "availability_start_date",
+        "python_experience": "python_experience",
+        "python": "python_experience",
+        "rag_vector_experience": "rag_vector_experience",
+        "rag_experience": "rag_vector_experience",
+        "vector_database_experience": "rag_vector_experience",
+        "vector_db_experience": "rag_vector_experience",
+    }
+
+    if normalized not in aliases:
+        raise ValueError(f"Unknown screening field: {field!r}")
+
+    return aliases[normalized]
 
 def _evaluate_field(field: str, value: str) -> Tuple[bool, Optional[str]]:
     """Check a single screening field against synthetic policy rules."""
