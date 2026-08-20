@@ -1,0 +1,51 @@
+========================================================================
+Q4 — REAL-TIME AGENT ASSIST LIVE DEMO
+========================================================================
+
+Pipeline:
+Audio Replay → Streaming ASR → Signal Detection → Nudge Generation
+
+Starting real-time stream...
+
+[  0.05s] CUSTOMER: I'm interested in applying for the financing.
+           SIGNAL  → PURCHASE_INTENT (confidence=1.00)
+           NUDGE   → [40] Customer shows purchase intent. Continue with the next qualification step. Evidence: 'I'm interested'
+
+[  2.10s] AGENT   : Great. Let me collect a few details.
+
+[  4.16s] CUSTOMER: The payment is too high and I'm worried I can't afford it.
+           SIGNAL  → PAYMENT_CONCERN (confidence=1.00)
+           NUDGE   → [80] Explore more affordable installment or tenor options. Evidence: 'I can't afford'
+
+[  6.21s] AGENT   : I understand your concern.
+
+[  8.26s] CUSTOMER: I'm interested in another option as well.
+           SIGNAL  → suppressed / no actionable signal
+
+[ 10.31s] CUSTOMER: The payment is too high and I'm worried I can't afford it.
+           SIGNAL  → PAYMENT_CONCERN (confidence=1.00)
+           NUDGE   → [80] Explore more affordable installment or tenor options. Evidence: 'The payment is too high'
+
+[ 12.36s] CUSTOMER: The payment is too high and I'm worried I can't afford it.
+           SIGNAL  → suppressed / no actionable signal
+
+[ 14.42s] CUSTOMER: I want to speak to a human.
+           SIGNAL  → HUMAN_ASSISTANCE_REQUEST (confidence=1.00)
+           NUDGE   → [100] Customer requested human assistance. Prepare escalation and notify supervisor. Evidence: 'I want to speak to a human'
+
+[ 16.47s] CUSTOMER: I want to speak to a human.
+           SIGNAL  → suppressed / no actionable signal
+
+========================================================================
+STREAM COMPLETE
+========================================================================
+
+Demonstrated:
+✓ Real-time transcript replay
+✓ Incremental signal detection
+✓ Purchase-intent detection
+✓ Payment-concern detection
+✓ Human-assistance escalation
+✓ Nudge priority
+✓ Duplicate/cooldown suppression
+
